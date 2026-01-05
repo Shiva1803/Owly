@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+/* Owly Design System - Brutalist/Minimalist */
+@theme {
+  /* Colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f8f8;
+  --color-border: #000000;
+
+  --color-text-primary: #000000;
+  --color-text-secondary: #4a4a4a;
+
+  --color-accent-primary: #ffff00;
+  /* Yellow */
+  --color-accent-hover: #e6e600;
+
+  --color-danger: #ff4444;
+  --color-success: #00cc00;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing/Radius */
+  --radius-none: 0;
+  --radius-sm: 2px;
+}
+
+/* Base Styles */
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  /* Dot Grid Pattern */
+  background-image: radial-gradient(#000000 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+::selection {
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+/* Custom Utilities */
+.brutalist-border {
+  border: 2px solid var(--color-border);
+}
+
+.brutalist-card {
+  background-color: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
+  box-shadow: 4px 4px 0px 0px var(--color-border);
+}
+
+.brutalist-btn {
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid var(--color-border);
+  box-shadow: 4px 4px 0px 0px var(--color-border);
+  transition: all 0.1s ease;
+  cursor: pointer;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.brutalist-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px 0px var(--color-border);
+  background-color: var(--color-accent-hover);
+}
+
+.brutalist-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+
+.brutalist-btn-secondary {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.brutalist-btn-secondary:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+.brutalist-input {
+  background-color: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  width: 100%;
+  color: var(--color-text-primary);
+  transition: all 0.2s ease;
+}
+
+.brutalist-input:focus {
+  outline: none;
+  box-shadow: 4px 4px 0px 0px var(--color-border);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+  border-left: 2px solid var(--color-border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
