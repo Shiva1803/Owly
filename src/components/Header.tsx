@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useVault } from '../context/VaultContext';
 import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 import { AutoLockSettings } from './AutoLockSettings';
 
 export function Header() {
-    const location = useLocation();
     const { isUnlocked, lock, setWalletAddress, timeUntilLock } = useVault();
     const account = useCurrentAccount();
     const [showAutoLockSettings, setShowAutoLockSettings] = useState(false);
@@ -29,8 +28,6 @@ export function Header() {
         }
     }, [timeUntilLock, isUnlocked]);
 
-    const isActive = (path: string) => location.pathname === path;
-
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -53,32 +50,6 @@ export function Header() {
                     </div>
                     <span className="text-lg sm:text-xl font-bold font-mono uppercase tracking-tight">Owly</span>
                 </Link>
-
-                {/* Navigation - Hidden on mobile */}
-                <nav className="hidden sm:flex items-center gap-6 md:gap-8">
-                    {isUnlocked && (
-                        <>
-                            <Link
-                                to="/"
-                                className={`text-sm font-bold uppercase tracking-wider hover:underline decoration-2 underline-offset-4 ${isActive('/')
-                                    ? 'underline decoration-accent-primary'
-                                    : 'text-text-primary'
-                                    }`}
-                            >
-                                Vault
-                            </Link>
-                            <Link
-                                to="/new"
-                                className={`text-sm font-bold uppercase tracking-wider hover:underline decoration-2 underline-offset-4 ${isActive('/new')
-                                    ? 'underline decoration-accent-primary'
-                                    : 'text-text-primary'
-                                    }`}
-                            >
-                                + New
-                            </Link>
-                        </>
-                    )}
-                </nav>
 
                 {/* Right side */}
                 <div className="flex items-center gap-2 sm:gap-3">
