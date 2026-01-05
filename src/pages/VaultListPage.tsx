@@ -111,21 +111,21 @@ export function VaultListPage() {
     return (
         <div className="max-w-4xl mx-auto px-4 py-8 animate-fadeIn">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8 border-b-2 border-border pb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 mb-8 border-b-2 border-border pb-6">
                 <div className="bg-bg-primary inline-block pr-4">
                     <h1 className="text-3xl font-bold uppercase tracking-tight">Your Vault</h1>
                     <p className="text-text-secondary mt-1 font-mono text-sm">
                         {items.length === 0
-                            ? 'VAULT IS EMPTY. INITIALIZE FIRST ENTRY.'
-                            : `[ ${items.length} ENCRYPTED ${items.length === 1 ? 'ITEM' : 'ITEMS'} DETECTED ]`
+                            ? 'VAULT IS EMPTY.'
+                            : `[ ${items.length} ENCRYPTED ${items.length === 1 ? 'ITEM' : 'ITEMS'} ]`
                         }
                     </p>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 w-full sm:w-auto">
                     <Link
                         to="/change-password"
-                        className="brutalist-btn brutalist-btn-secondary flex items-center gap-2"
+                        className="brutalist-btn brutalist-btn-secondary flex-1 sm:flex-none justify-center items-center gap-2"
                         title="Change Master Password"
                     >
                         <svg
@@ -144,7 +144,7 @@ export function VaultListPage() {
                         </svg>
                         <span className="hidden sm:inline">Change Password</span>
                     </Link>
-                    <Link to="/new" className="brutalist-btn flex items-center gap-2">
+                    <Link to="/new" className="brutalist-btn flex-1 sm:flex-none justify-center items-center gap-2">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="w-5 h-5"
@@ -159,15 +159,15 @@ export function VaultListPage() {
                                 d="M12 4v16m8-8H4"
                             />
                         </svg>
-                        New Entry
+                        <span className="sm:inline">New Entry</span>
                     </Link>
                 </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="brutalist-card p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 border-2 border-border bg-accent-primary flex items-center justify-center font-bold text-xl">
+                    <div className="w-12 h-12 border-2 border-border bg-accent-primary flex items-center justify-center font-bold text-xl shrink-0">
                         Σ
                     </div>
                     <div>
@@ -177,7 +177,7 @@ export function VaultListPage() {
                 </div>
 
                 <div className="brutalist-card p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 border-2 border-border bg-bg-secondary flex items-center justify-center font-bold">
+                    <div className="w-12 h-12 border-2 border-border bg-bg-secondary flex items-center justify-center font-bold shrink-0">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="w-6 h-6 text-text-primary"
@@ -200,7 +200,7 @@ export function VaultListPage() {
                 </div>
 
                 <div className="brutalist-card p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 border-2 border-border bg-accent-primary flex items-center justify-center font-bold">
+                    <div className="w-12 h-12 border-2 border-border bg-accent-primary flex items-center justify-center font-bold shrink-0">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="w-6 h-6 text-text-primary"
@@ -262,13 +262,13 @@ export function VaultListPage() {
 
             {/* Filter Tabs */}
             {items.length > 0 && (
-                <div className="flex gap-4 mb-6">
+                <div className="flex flex-wrap gap-4 mb-6">
                     {(['all', 'password', 'note'] as const).map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`
-                px-6 py-2 border-2 border-border text-sm font-bold uppercase tracking-wider transition-all
+                px-6 py-2 border-2 border-border text-sm font-bold uppercase tracking-wider transition-all flex-1 sm:flex-none
                 ${filter === f
                                     ? 'bg-text-primary text-bg-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
                                     : 'bg-white text-text-primary hover:bg-bg-secondary'

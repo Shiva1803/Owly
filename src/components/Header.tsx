@@ -52,7 +52,7 @@ export function Header() {
                 </Link>
 
                 {/* Right side */}
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-1.5 sm:gap-3">
                     {isUnlocked && (
                         <>
                             {/* Auto-Lock Timer Button */}
