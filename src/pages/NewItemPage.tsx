@@ -13,7 +13,7 @@ type TabType = 'password' | 'note';
 export function NewItemPage() {
     const [activeTab, setActiveTab] = useState<TabType>('password');
     const [isLoading, setIsLoading] = useState(false);
-    const [loadingStep, setLoadingStep] = useState<'encrypting' | 'uploading' | 'signing' | null>(null);
+    const [loadingStep, setLoadingStep] = useState<'encrypting' | 'uploading' | 'signing' | 'confirming' | null>(null);
     const [error, setError] = useState('');
 
     // Password form
@@ -160,7 +160,10 @@ export function NewItemPage() {
             signAndExecuteTransaction(
                 { transaction: tx },
                 {
-                    onSuccess: () => {
+                    onSuccess: async () => {
+                        // Wait for blockchain to index the new item
+                        setLoadingStep('confirming');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                         // Success! Navigate to vault
                         setLoadingStep(null);
                         navigate('/');
@@ -590,6 +593,7 @@ export function NewItemPage() {
                                 {loadingStep === 'encrypting' && 'ENCRYPTING...'}
                                 {loadingStep === 'uploading' && 'UPLOADING TO WALRUS...'}
                                 {loadingStep === 'signing' && 'SIGNING TRANSACTION...'}
+                                {loadingStep === 'confirming' && 'CONFIRMING ON BLOCKCHAIN...'}
                                 {!loadingStep && 'PROCESSING...'}
                             </span>
                         ) : (
