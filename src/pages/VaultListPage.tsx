@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useCurrentAccount } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import type { VaultItem, VaultPayload } from '../types';
 import { VaultItemCard } from '../components/VaultItemCard';
-import { getVaultItems } from '../services/sui';
+import { getVaultItems, deleteVaultItemTransaction } from '../services/sui';
 import { downloadFromWalrus } from '../services/walrus';
 import { decryptData } from '../services/encryption';
 import { useVault } from '../context/VaultContext';
@@ -12,6 +12,7 @@ interface DecryptedItem {
     item: VaultItem;
     title: string;
     created_at: number;
+    isOrphaned: boolean; // True if Walrus blob is missing/expired
 }
 
 export function VaultListPage() {
@@ -21,10 +22,44 @@ export function VaultListPage() {
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'password' | 'note'>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
     const account = useCurrentAccount();
     const { masterKey } = useVault();
     const location = useLocation();
+    const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+
+    // Delete orphaned item from blockchain
+    const handleDeleteOrphaned = async (itemId: string) => {
+        if (!account?.address) return;
+
+        setDeletingItemId(itemId);
+        try {
+            const tx = deleteVaultItemTransaction(itemId);
+            await signAndExecute({ transaction: tx });
+            // Remove from local state
+            setItems(prev => prev.filter(entry => entry.item.id !== itemId));
+        } catch (err) {
+            console.error('Failed to delete orphaned item:', err);
+            alert('Failed to delete item. Please try again.');
+        } finally {
+            setDeletingItemId(null);
+        }
+    };
+
+    // Delete all orphaned items
+    const handleDeleteAllOrphaned = async () => {
+        const orphanedItems = items.filter(entry => entry.isOrphaned);
+        if (orphanedItems.length === 0) return;
+
+        if (!confirm(`Delete ${orphanedItems.length} orphaned item(s)? This cannot be undone.`)) {
+            return;
+        }
+
+        for (const entry of orphanedItems) {
+            await handleDeleteOrphaned(entry.item.id);
+        }
+    };
 
     // Fetch and decrypt vault items
     const fetchItems = async () => {
@@ -66,14 +101,16 @@ export function VaultListPage() {
                         item,
                         title: decryptedPayload.title,
                         created_at: decryptedPayload.created_at || item.created_at,
+                        isOrphaned: false,
                     });
                 } catch (decryptError) {
                     console.error(`Failed to decrypt item ${item.id}:`, decryptError);
-                    // Add with fallback title
+                    // Mark as orphaned
                     decryptedItems.push({
                         item,
                         title: 'Unable to decrypt',
                         created_at: item.created_at,
+                        isOrphaned: true,
                     });
                 }
             }
@@ -105,8 +142,9 @@ export function VaultListPage() {
         return true;
     });
 
-    const passwordCount = items.filter((e) => e.item.category === 'password').length;
-    const noteCount = items.filter((e) => e.item.category === 'note').length;
+    const passwordCount = items.filter((e) => e.item.category === 'password' && !e.isOrphaned).length;
+    const noteCount = items.filter((e) => e.item.category === 'note' && !e.isOrphaned).length;
+    const orphanedCount = items.filter((e) => e.isOrphaned).length;
 
     return (
         <div className="max-w-4xl mx-auto px-4 py-8 animate-fadeIn">
@@ -117,7 +155,7 @@ export function VaultListPage() {
                     <p className="text-text-secondary mt-1 font-mono text-sm">
                         {items.length === 0
                             ? 'VAULT IS EMPTY.'
-                            : `[ ${items.length} ENCRYPTED ${items.length === 1 ? 'ITEM' : 'ITEMS'} ]`
+                            : `[ ${items.length - orphanedCount} ENCRYPTED ${items.length - orphanedCount === 1 ? 'ITEM' : 'ITEMS'} ]`
                         }
                     </p>
                 </div>
@@ -164,6 +202,34 @@ export function VaultListPage() {
                 </div>
             </div>
 
+            {/* Orphaned Items Warning */}
+            {orphanedCount > 0 && !isLoading && (
+                <div className="mb-6 p-4 border-2 border-danger bg-danger/10">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-danger shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div>
+                                <p className="font-bold text-danger uppercase text-sm">
+                                    {orphanedCount} Orphaned {orphanedCount === 1 ? 'Item' : 'Items'} Detected
+                                </p>
+                                <p className="text-text-secondary text-xs font-mono">
+                                    Data expired on Walrus storage. These can be safely removed.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleDeleteAllOrphaned}
+                            className="brutalist-btn !bg-danger !text-white !border-danger shrink-0 text-xs"
+                            disabled={deletingItemId !== null}
+                        >
+                            {deletingItemId ? 'DELETING...' : 'DELETE ALL'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="brutalist-card p-4 flex items-center gap-4">
@@ -171,7 +237,7 @@ export function VaultListPage() {
                         Σ
                     </div>
                     <div>
-                        <p className="text-3xl font-bold leading-none">{items.length}</p>
+                        <p className="text-3xl font-bold leading-none">{items.length - orphanedCount}</p>
                         <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">Total Items</p>
                     </div>
                 </div>
@@ -357,14 +423,47 @@ export function VaultListPage() {
             ) : (
                 <div className="space-y-4">
                     {filteredItems.map((entry) => (
-                        <VaultItemCard
-                            key={entry.item.id}
-                            item={{
-                                ...entry.item,
-                                created_at: entry.created_at
-                            }}
-                            title={entry.title}
-                        />
+                        <div key={entry.item.id} className="relative">
+                            {entry.isOrphaned ? (
+                                // Orphaned item card with delete button
+                                <div className="brutalist-card p-4 border-danger bg-danger/5 flex items-center gap-4">
+                                    <div className="w-12 h-12 border-2 border-danger bg-danger/20 flex items-center justify-center shrink-0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-lg text-danger uppercase tracking-tight">
+                                            Data Expired
+                                        </h3>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-xs font-bold px-2 py-0.5 border border-danger bg-danger/20 text-danger uppercase">
+                                                {entry.item.category}
+                                            </span>
+                                            <span className="text-xs text-text-secondary font-mono">
+                                                Blob expired on Walrus
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleDeleteOrphaned(entry.item.id)}
+                                        disabled={deletingItemId === entry.item.id}
+                                        className="brutalist-btn !bg-danger !text-white !border-danger shrink-0 text-xs"
+                                    >
+                                        {deletingItemId === entry.item.id ? 'DELETING...' : 'DELETE'}
+                                    </button>
+                                </div>
+                            ) : (
+                                // Normal item card
+                                <VaultItemCard
+                                    item={{
+                                        ...entry.item,
+                                        created_at: entry.created_at
+                                    }}
+                                    title={entry.title}
+                                />
+                            )}
+                        </div>
                     ))}
                 </div>
             )}
