@@ -204,7 +204,7 @@ export function VaultListPage() {
 
             {/* Orphaned Items Warning */}
             {orphanedCount > 0 && !isLoading && (
-                <div className="mb-6 p-4 border-2 border-danger bg-danger/10">
+                <div className="mb-6 p-4 border-2 border-danger" style={{ backgroundColor: '#fee2e2' }}>
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-danger shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
