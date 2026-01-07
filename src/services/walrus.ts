@@ -19,9 +19,9 @@ interface WalrusStoreResponse {
 }
 
 // Storage duration in epochs
-// Testnet: 1 epoch = ~1 day, so 200 epochs = ~200 days
-// Mainnet: 1 epoch = ~2 weeks, so 200 epochs = ~7.5 years
-const STORAGE_EPOCHS = 200;
+// Testnet has a limit on max epochs ahead - using 50 epochs (~50 days on testnet)
+// Mainnet: 1 epoch = ~2 weeks, so 50 epochs = ~1.9 years
+const STORAGE_EPOCHS = 50;
 
 /**
  * Uploads encrypted data to Walrus
