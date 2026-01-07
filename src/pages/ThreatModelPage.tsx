@@ -190,7 +190,7 @@ export function ThreatModelPage() {
                         6. Encryption Boundary
                     </h2>
                     <p className="mb-4">
-                        Encryption and decryption occur <strong>only on the client</strong> using Seal.
+                        Encryption and decryption occur <strong>only on the client</strong> using Mysten Seal.
                     </p>
                     <p className="mb-2">At no point does Owly:</p>
                     <ul className="font-mono text-sm space-y-1">

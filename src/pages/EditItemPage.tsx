@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
-import { useCurrentAccount } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { useVault } from '../context/VaultContext';
 import { encryptData, decryptData } from '../services/encryption';
 import { PasswordInput } from '../components/PasswordInput';
@@ -26,6 +26,9 @@ export function EditItemPage() {
     const [noteTags, setNoteTags] = useState('');
     const [noteBgColor, setNoteBgColor] = useState('#ffffff');
     const [showColorPalette, setShowColorPalette] = useState(false);
+    const [showImageUpload, setShowImageUpload] = useState(false);
+    const [noteImages, setNoteImages] = useState<string[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
     const [lastEditedTime, setLastEditedTime] = useState<Date | null>(null);
 
     // Light pastel colors for note background
@@ -40,23 +43,80 @@ export function EditItemPage() {
 
     // Ref for color palette click-outside detection
     const colorPaletteRef = useRef<HTMLDivElement>(null);
+    const imageUploadRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Handle click outside to close color palette
+    // Handle click outside to close color palette and image upload
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (colorPaletteRef.current && !colorPaletteRef.current.contains(event.target as Node)) {
                 setShowColorPalette(false);
             }
+            if (imageUploadRef.current && !imageUploadRef.current.contains(event.target as Node)) {
+                setShowImageUpload(false);
+            }
         };
 
-        if (showColorPalette) {
+        if (showColorPalette || showImageUpload) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showColorPalette]);
+    }, [showColorPalette, showImageUpload]);
+
+    // Image upload handlers
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_IMAGES_PER_NOTE = 3;
+
+    const handleImageSelect = (files: FileList | null) => {
+        if (!files) return;
+
+        const remainingSlots = MAX_IMAGES_PER_NOTE - noteImages.length;
+        if (remainingSlots <= 0) {
+            alert(`Maximum ${MAX_IMAGES_PER_NOTE} images per note allowed.`);
+            return;
+        }
+
+        const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+        filesToProcess.forEach(file => {
+            if (!file.type.startsWith('image/')) {
+                alert(`${file.name} is not an image file.`);
+                return;
+            }
+            if (file.size > MAX_IMAGE_SIZE) {
+                alert(`${file.name} exceeds 5MB limit.`);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64 = e.target?.result as string;
+                setNoteImages(prev => [...prev, base64]);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        setShowImageUpload(false);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        handleImageSelect(e.dataTransfer.files);
+    };
 
     // Format last edited timestamp
     const formatLastEdited = (date: Date): string => {
@@ -82,12 +142,18 @@ export function EditItemPage() {
 
     const navigate = useNavigate();
     const account = useCurrentAccount();
-    const { masterKey } = useVault();
+    const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+    const { sessionKey } = useVault();
 
     // Fetch and decrypt existing item
     const fetchItem = useCallback(async () => {
-        if (!id || !masterKey) {
+        if (!id || !account?.address) {
             setIsLoading(false);
+            return;
+        }
+
+        if (!sessionKey) {
+            navigate('/unlock');
             return;
         }
 
@@ -95,14 +161,27 @@ export function EditItemPage() {
         setError('');
 
         try {
-            const { getLocalItemData } = await import('../services/localStorage');
-            const encryptedData = getLocalItemData(id);
+            // Find the vault item to get its blob ID
+            const { getVaultItems } = await import('../services/sui');
+            const { downloadFromWalrus } = await import('../services/walrus');
 
-            if (!encryptedData) {
+            const vaultItems = await getVaultItems(account.address);
+            const vaultItem = vaultItems.find(item => item.id === id);
+
+            if (!vaultItem) {
                 throw new Error('Item not found');
             }
 
-            const decryptedData = await decryptData(encryptedData, masterKey);
+            // Download encrypted data from Walrus
+            const encryptedData = await downloadFromWalrus(vaultItem.walrus_blob_id);
+
+            // Decrypt locally using Seal with SessionKey
+            const decryptedData = await decryptData(
+                encryptedData,
+                sessionKey,
+                vaultItem,
+                account.address
+            );
             setOriginalData(decryptedData);
 
             // Populate form fields based on type
@@ -117,14 +196,15 @@ export function EditItemPage() {
                 setNoteBody(decryptedData.body);
                 setNoteTags(decryptedData.tags.join(', '));
                 setNoteBgColor(decryptedData.backgroundColor || '#ffffff');
+                setNoteImages(decryptedData.images || []);
             }
         } catch (err) {
             console.error('Failed to fetch/decrypt item:', err);
-            setError(err instanceof Error ? err.message : 'Failed to decrypt. Wrong master password?');
+            setError(err instanceof Error ? err.message : 'Failed to decrypt. Please try unlocking again.');
         } finally {
             setIsLoading(false);
         }
-    }, [id, masterKey]);
+    }, [id, sessionKey, account?.address, navigate]);
 
     useEffect(() => {
         fetchItem();
@@ -133,7 +213,7 @@ export function EditItemPage() {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
-        if (!masterKey || !account?.address || !id || !originalData) {
+        if (!sessionKey || !account?.address || !id || !originalData) {
             setError('Please unlock your vault first');
             return;
         }
@@ -177,25 +257,49 @@ export function EditItemPage() {
                     body: noteBody,
                     tags: noteTags.split(',').map((t) => t.trim()).filter(Boolean),
                     backgroundColor: noteBgColor !== '#ffffff' ? noteBgColor : undefined,
+                    images: noteImages.length > 0 ? noteImages : undefined,
                     created_at: originalData.created_at,
                     updated_at: now,
                 };
                 category = 'note';
             }
 
-            // Encrypt data locally
-            const encryptedData = await encryptData(payload, masterKey);
+            // Encrypt data locally using Seal
+            const encryptedData = await encryptData(payload, account.address);
 
-            // Update in localStorage
-            const { updateLocalItem } = await import('../services/localStorage');
-            updateLocalItem(id, encryptedData, category);
+            // Import services
+            const { uploadToWalrus } = await import('../services/walrus');
+            const { createVaultItemTransaction } = await import('../services/sui');
 
-            // Navigate back to view
-            navigate(`/vault/${id}`);
+            // 1. Upload new encrypted data to Walrus
+            const blobId = await uploadToWalrus(encryptedData);
+
+            // 2. Create new transaction on Sui
+            // We append a new item. The old one remains but will be superseded in the UI logic eventually or deleted separately.
+            const tx = createVaultItemTransaction(blobId, category);
+
+            // 3. Execute transaction
+            signAndExecuteTransaction(
+                {
+                    transaction: tx,
+                },
+                {
+                    onSuccess: () => {
+                        // Navigate back to home or the new item?
+                        // Since ID will change (it's the object ID), we should probably go to home.
+                        navigate('/');
+                    },
+                    onError: (err) => {
+                        console.error('Transaction failed:', err);
+                        setError('Failed to save changes. Please try again.');
+                        setIsSaving(false);
+                    },
+                }
+            );
+
         } catch (err) {
             console.error('Failed to update vault item:', err);
             setError(err instanceof Error ? err.message : 'Failed to update entry. Please try again.');
-        } finally {
             setIsSaving(false);
         }
     };
@@ -242,7 +346,7 @@ export function EditItemPage() {
                 </Link>
                 <h1 className="text-3xl font-bold uppercase tracking-tight">Edit Entry</h1>
                 <p className="text-text-secondary mt-1 font-mono text-sm">
-                    [ MODIFYING ENCRYPTED DATA ]
+                    [ CREATING NEW VERSION ]
                 </p>
             </div>
 
@@ -529,6 +633,50 @@ export function EditItemPage() {
                                                 </div>
                                             )}
                                         </div>
+                                        {/* Image Upload */}
+                                        <div className="relative" ref={imageUploadRef}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowImageUpload(!showImageUpload)}
+                                                className="w-8 h-8 flex items-center justify-center hover:bg-bg-primary border border-transparent hover:border-border transition-all"
+                                                title="Add Image"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            </button>
+                                            {showImageUpload && (
+                                                <div className="absolute bottom-full left-0 mb-2 bg-bg-primary border-2 border-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 w-72 z-50">
+                                                    <div className="text-xs font-bold uppercase mb-3 text-text-primary">Add Image</div>
+                                                    <div
+                                                        className={`border-2 border-dashed p-6 text-center cursor-pointer transition-all ${isDragging ? 'border-accent-primary bg-accent-primary/10' : 'border-border hover:border-text-secondary'
+                                                            }`}
+                                                        onDragOver={handleDragOver}
+                                                        onDragLeave={handleDragLeave}
+                                                        onDrop={handleDrop}
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 mx-auto mb-2 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                        </svg>
+                                                        <p className="text-xs font-bold text-text-secondary">Click to choose or drag & drop</p>
+                                                        <input
+                                                            ref={fileInputRef}
+                                                            type="file"
+                                                            accept="image/*"
+                                                            multiple
+                                                            className="hidden"
+                                                            onChange={(e) => handleImageSelect(e.target.files)}
+                                                        />
+                                                    </div>
+                                                    <div className="mt-3 space-y-1">
+                                                        <p className="text-xs text-text-secondary font-mono">• Max size: 5MB per image</p>
+                                                        <p className="text-xs text-text-secondary font-mono">• Limit: {MAX_IMAGES_PER_NOTE} images per note</p>
+                                                        <p className="text-xs text-text-secondary font-mono">• Added: {noteImages.length}/{MAX_IMAGES_PER_NOTE}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                         {/* Spacer to push timestamp to the right */}
                                         <div className="flex-1"></div>
                                         {/* Last Edited Timestamp */}
@@ -539,6 +687,33 @@ export function EditItemPage() {
                                         )}
                                     </div>
                                 </div>
+                                {/* Image Preview Section */}
+                                {noteImages.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                        <p className="text-xs font-bold uppercase text-text-secondary">Attached Images ({noteImages.length}/{MAX_IMAGES_PER_NOTE})</p>
+                                        <div className="flex flex-wrap gap-3">
+                                            {noteImages.map((img, index) => (
+                                                <div key={index} className="relative group">
+                                                    <img
+                                                        src={img}
+                                                        alt={`Attached ${index + 1}`}
+                                                        className="w-24 h-24 object-cover border-2 border-border"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNoteImages(prev => prev.filter((_, i) => i !== index))}
+                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-danger text-white border-2 border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title="Remove image"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div>

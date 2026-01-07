@@ -26,7 +26,7 @@ export function HowToUsePage() {
             {/* Main Content */}
             <div className="space-y-8">
                 {/* Step 1 */}
-                <section className="brutalist-card p-6">
+                <section id="wallet-setup" className="brutalist-card p-6">
                     <h2 className="text-xl font-bold uppercase mb-4 border-b-2 border-border pb-2">
                         1. Connect Your Wallet
                     </h2>
@@ -105,6 +105,7 @@ export function HowToUsePage() {
                             <ul className="font-mono text-sm space-y-1">
                                 <li>• Title</li>
                                 <li>• Body text</li>
+                                <li>• Attach images (max 3, 5MB each)</li>
                                 <li>• Optional tags</li>
                             </ul>
                         </div>

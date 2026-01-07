@@ -88,4 +88,21 @@ module vault::vault {
     public fun get_created_at(item: &VaultItem): u64 {
         item.created_at
     }
+
+    /// Seal Access Control
+    /// Error: Caller does not have access to decrypt
+    const ENoAccess: u64 = 1;
+
+    /// Seal approve function - called by Seal SDK to verify decryption access
+    /// Only the owner of the VaultItem can decrypt its contents
+    /// The key_id must match the owner's address (set during encryption)
+    /// Key format: [owner address bytes]
+    entry fun seal_approve(key_id: vector<u8>, _item: &VaultItem, ctx: &TxContext) {
+        // Get the caller's address (owner of the item, enforced by Sui)
+        let caller = tx_context::sender(ctx);
+        
+        // The key_id used for encryption should be the owner's address
+        // This ensures only the owner can decrypt
+        assert!(key_id == caller.to_bytes(), ENoAccess);
+    }
 }

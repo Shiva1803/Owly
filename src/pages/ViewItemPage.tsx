@@ -12,10 +12,11 @@ export function ViewItemPage() {
     const navigate = useNavigate();
     const account = useCurrentAccount();
     const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
-    const { masterKey } = useVault();
+    const { sessionKey } = useVault();
 
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteStep, setDeleteStep] = useState<'signing' | 'confirming' | null>(null);
     const [error, setError] = useState('');
     const [data, setData] = useState<VaultPayload | null>(null);
     const [showPassword, setShowPassword] = useState(false);
@@ -24,8 +25,14 @@ export function ViewItemPage() {
 
     // Fetch and decrypt item
     const fetchItem = useCallback(async () => {
-        if (!id || !masterKey || !account?.address) {
+        if (!id || !account?.address) {
             setIsLoading(false);
+            return;
+        }
+
+        if (!sessionKey) {
+            // If not unlocked, redirect to unlock
+            navigate('/unlock');
             return;
         }
 
@@ -44,16 +51,21 @@ export function ViewItemPage() {
             // Download encrypted data from Walrus
             const encryptedData = await downloadFromWalrus(vaultItem.walrus_blob_id);
 
-            // Decrypt locally
-            const decryptedData = await decryptData(encryptedData, masterKey);
+            // Decrypt locally using Seal with SessionKey
+            const decryptedData = await decryptData(
+                encryptedData,
+                sessionKey,
+                vaultItem,
+                account.address
+            );
             setData(decryptedData);
         } catch (err) {
             console.error('Failed to fetch/decrypt item:', err);
-            setError(err instanceof Error ? err.message : 'Failed to decrypt. Wrong master password?');
+            setError(err instanceof Error ? err.message : 'Failed to decrypt. Please try unlocking again.');
         } finally {
             setIsLoading(false);
         }
-    }, [id, masterKey, account?.address]);
+    }, [id, sessionKey, account?.address, navigate]);
 
     useEffect(() => {
         fetchItem();
@@ -69,6 +81,7 @@ export function ViewItemPage() {
         if (!id) return;
 
         setIsDeleting(true);
+        setDeleteStep('signing');
         try {
             // Create delete transaction
             const tx = deleteVaultItemTransaction(id);
@@ -77,13 +90,18 @@ export function ViewItemPage() {
             signAndExecuteTransaction(
                 { transaction: tx },
                 {
-                    onSuccess: () => {
+                    onSuccess: async () => {
+                        // Wait for blockchain to index the deletion
+                        setDeleteStep('confirming');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        setDeleteStep(null);
                         navigate('/');
                     },
                     onError: (err) => {
                         console.error('Failed to delete item:', err);
                         setError('Failed to delete item. Please try again.');
                         setIsDeleting(false);
+                        setDeleteStep(null);
                         setShowDeleteConfirm(false);
                     },
                 }
@@ -92,6 +110,7 @@ export function ViewItemPage() {
             console.error('Failed to delete item:', err);
             setError('Failed to delete item. Please try again.');
             setIsDeleting(false);
+            setDeleteStep(null);
             setShowDeleteConfirm(false);
         }
     };
@@ -192,6 +211,20 @@ export function ViewItemPage() {
                 </Link>
 
                 <div className="flex items-center gap-4">
+                    {/* View on SuiScan */}
+                    <a
+                        href={`https://suiscan.xyz/testnet/object/${id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-2 py-1 border-2 border-border bg-bg-secondary font-bold uppercase text-sm hover:bg-bg-primary transition-colors"
+                        title="View on SuiScan"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <span className="hidden sm:inline">SuiScan</span>
+                    </a>
+
                     {/* Edit Button */}
                     <Link
                         to={`/edit/${id}`}
@@ -346,6 +379,25 @@ export function ViewItemPage() {
                                 ))}
                             </p>
                         </div>
+
+                        {/* Attached Images */}
+                        {data.images && data.images.length > 0 && (
+                            <div className="space-y-3">
+                                <p className="text-xs font-bold uppercase text-text-secondary">Attached Images ({data.images.length})</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {data.images.map((img, index) => (
+                                        <div key={index} className="border-2 border-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+                                            <img
+                                                src={img}
+                                                alt={`Attachment ${index + 1}`}
+                                                className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => window.open(img, '_blank')}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -371,7 +423,11 @@ export function ViewItemPage() {
                                 disabled={isDeleting}
                                 className="brutalist-btn flex-1 !bg-danger !text-white !border-danger hover:!bg-danger/90"
                             >
-                                {isDeleting ? 'DELETING...' : 'CONFIRM DELETE'}
+                                {isDeleting ? (
+                                    deleteStep === 'signing' ? 'SIGNING...' :
+                                        deleteStep === 'confirming' ? 'CONFIRMING ON BLOCKCHAIN...' :
+                                            'DELETING...'
+                                ) : 'CONFIRM DELETE'}
                             </button>
                         </div>
                     </div>

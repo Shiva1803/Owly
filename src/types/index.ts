@@ -9,6 +9,7 @@ export interface NotePayload {
     body: string;
     tags: string[];
     backgroundColor?: string;
+    images?: string[]; // Base64 encoded images
     created_at: number;
     updated_at: number;
 }
@@ -41,12 +42,7 @@ export interface DecryptedVaultEntry {
     data: VaultPayload;
 }
 
-// Vault session state
-export interface VaultSession {
-    isUnlocked: boolean;
-    masterKeyHash?: string; // For verification, not stored
-    walletAddress?: string;
-}
+
 
 // Form states
 export interface NewNoteForm {

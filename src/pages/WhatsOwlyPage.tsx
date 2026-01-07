@@ -65,6 +65,7 @@ export function WhatsOwlyPage() {
                     <ul className="space-y-2 font-mono text-sm">
                         <li>• Store passwords securely</li>
                         <li>• Save private notes</li>
+                        <li>• Attach private images to notes</li>
                         <li>• Organize secrets with tags</li>
                         <li>• Search within your vault</li>
                         <li>• Copy credentials when needed</li>

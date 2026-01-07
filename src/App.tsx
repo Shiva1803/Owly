@@ -17,7 +17,6 @@ import { ThreatModelPage } from './pages/ThreatModelPage';
 import { EncryptionPage } from './pages/EncryptionPage';
 import { WhatsOwlyPage } from './pages/WhatsOwlyPage';
 import { HowToUsePage } from './pages/HowToUsePage';
-import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { AutoLockWarning } from './components/AutoLockWarning';
 
 const queryClient = new QueryClient();
@@ -81,14 +80,7 @@ function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/change-password"
-            element={
-              <ProtectedRoute>
-                <ChangePasswordPage />
-              </ProtectedRoute>
-            }
-          />
+
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/threat-model" element={<ThreatModelPage />} />
           <Route path="/encryption" element={<EncryptionPage />} />

@@ -25,7 +25,7 @@ export function VaultListPage() {
     const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
     const account = useCurrentAccount();
-    const { masterKey } = useVault();
+    const { sessionKey } = useVault();
     const location = useLocation();
     const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
@@ -63,7 +63,7 @@ export function VaultListPage() {
 
     // Fetch and decrypt vault items
     const fetchItems = async () => {
-        if (!account?.address || !masterKey) {
+        if (!account?.address || !sessionKey) {
             setIsLoading(false);
             return;
         }
@@ -94,8 +94,13 @@ export function VaultListPage() {
                     // Download encrypted data from Walrus
                     const encryptedData = await downloadFromWalrus(item.walrus_blob_id);
 
-                    // Decrypt with master key
-                    const decryptedPayload = await decryptData(encryptedData, masterKey) as VaultPayload;
+                    // Decrypt with Seal SessionKey
+                    const decryptedPayload = await decryptData(
+                        encryptedData,
+                        sessionKey,
+                        item,
+                        account.address
+                    ) as VaultPayload;
 
                     decryptedItems.push({
                         item,
@@ -127,7 +132,7 @@ export function VaultListPage() {
     // Refetch when navigating to this page (handles returning from /new or /edit)
     useEffect(() => {
         fetchItems();
-    }, [account?.address, masterKey, location.key]);
+    }, [account?.address, sessionKey, location.key]);
 
     // Filter and search
     const filteredItems = items.filter((entry) => {
@@ -161,10 +166,35 @@ export function VaultListPage() {
                 </div>
 
                 <div className="flex gap-3 w-full sm:w-auto">
-                    <Link
-                        to="/change-password"
-                        className="brutalist-btn brutalist-btn-secondary flex-1 sm:flex-none justify-center items-center gap-2"
-                        title="Change Master Password"
+                    <button
+                        onClick={() => {
+                            // Export vault backup as JSON
+                            const backup = {
+                                exportedAt: new Date().toISOString(),
+                                walletAddress: account?.address || '',
+                                network: 'testnet',
+                                itemCount: items.filter(e => !e.isOrphaned).length,
+                                items: items
+                                    .filter(e => !e.isOrphaned)
+                                    .map(e => ({
+                                        id: e.item.id,
+                                        category: e.item.category,
+                                        title: e.title,
+                                        walrusBlobId: e.item.walrus_blob_id,
+                                        createdAt: e.created_at,
+                                    })),
+                            };
+                            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `owly-backup-${Date.now()}.json`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        }}
+                        disabled={items.length === 0 || isLoading}
+                        className="brutalist-btn brutalist-btn-secondary flex-1 sm:flex-none justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Export Vault Backup"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -177,11 +207,11 @@ export function VaultListPage() {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                             />
                         </svg>
-                        <span className="hidden sm:inline">Change Password</span>
-                    </Link>
+                        <span className="hidden sm:inline">Export</span>
+                    </button>
                     <Link to="/new" className="brutalist-btn flex-1 sm:flex-none justify-center items-center gap-2">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"

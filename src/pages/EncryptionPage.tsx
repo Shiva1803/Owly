@@ -99,6 +99,7 @@ export function EncryptionPage() {
                         4. Encryption & Decryption Boundary
                     </h2>
                     <div className="flex items-start gap-6">
+
                         <div className="flex-shrink-0">
                             <img
                                 src="/seal.png"
@@ -110,19 +111,19 @@ export function EncryptionPage() {
                             <p className="mb-4 text-text-secondary">
                                 Encryption and decryption happen only inside the client using{' '}
                                 <a
-                                    href="https://seal.mystenlabs.com/"
+                                    href="https://github.com/mystenlabs/seal"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-[#e8ff7f] font-bold hover:underline"
                                 >
-                                    Seal
+                                    Mysten Seal
                                 </a>.
                             </p>
-                            <p className="mb-2 font-bold">Seal provides:</p>
+                            <p className="mb-2 font-bold">This provides:</p>
                             <ul className="space-y-1 font-mono text-sm">
-                                <li>• Secure encryption primitives</li>
-                                <li>• Deterministic behavior</li>
-                                <li>• Local-only cryptographic operations</li>
+                                <li>• Identity-based encryption (IBE)</li>
+                                <li>• Distributed key management</li>
+                                <li>• Threshold decryption via Seal Network</li>
                             </ul>
                         </div>
                     </div>

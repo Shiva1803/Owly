@@ -86,7 +86,7 @@ export function PrivacyPage() {
                     <ul className="space-y-2 font-mono text-sm mb-4">
                         <li>• <strong className="text-[#33ffea]">Encrypted content</strong> is stored on Walrus</li>
                         <li>• <strong className="text-[#3498db]">Ownership & references</strong> are stored on Sui</li>
-                        <li>• <strong className="text-[#e8ff7f]">Encryption & decryption</strong> are handled locally using Seal</li>
+                        <li>• <strong className="text-[#e8ff7f]">Encryption & decryption</strong> are handled locally using Mysten Seal SDK</li>
                     </ul>
                     <div className="bg-bg-secondary p-4 border-2 border-border">
                         <p className="font-bold mb-2">This ensures:</p>

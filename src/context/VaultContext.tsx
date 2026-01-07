@@ -1,14 +1,14 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import type { SessionKey } from '@mysten/seal';
 
 const DEFAULT_AUTO_LOCK_MINUTES = 15;
 const AUTO_LOCK_STORAGE_KEY = 'owly_auto_lock_minutes';
 
 interface VaultContextType {
-    // Master key (derived from password + wallet address)
-    masterKey: CryptoKey | null;
-    setMasterKey: (key: CryptoKey | null) => void;
+    // Session state - now uses proper Seal SessionKey
+    sessionKey: SessionKey | null;
+    setSessionKey: (key: SessionKey | null) => void;
 
-    // Session state
     isUnlocked: boolean;
 
     // Actions
@@ -28,7 +28,7 @@ interface VaultContextType {
 const VaultContext = createContext<VaultContextType | null>(null);
 
 export function VaultProvider({ children }: { children: ReactNode }) {
-    const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
+    const [sessionKey, setSessionKey] = useState<SessionKey | null>(null);
     const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
     // Auto-lock state
@@ -41,10 +41,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastActivityRef = useRef<number>(Date.now());
 
-    const isUnlocked = masterKey !== null;
+    const isUnlocked = sessionKey !== null;
 
     const lock = useCallback(() => {
-        setMasterKey(null);
+        setSessionKey(null);
         // Reset timer when locked
         setTimeUntilLock(autoLockMinutes * 60);
     }, [autoLockMinutes]);
@@ -133,8 +133,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     return (
         <VaultContext.Provider
             value={{
-                masterKey,
-                setMasterKey,
+                sessionKey,
+                setSessionKey,
                 isUnlocked,
                 lock,
                 walletAddress,
